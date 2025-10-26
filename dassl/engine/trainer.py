@@ -449,10 +449,8 @@ class SimpleTrainer(TrainerBase):
             current_epoch_num = self.epoch + 1
             epoch_to_delete = current_epoch_num - self.cfg.TRAIN.CHECKPOINT_FREQ
 
-            # Chỉ thực hiện xóa nếu đây là lưu định kỳ (không phải epoch cuối cùng của FREQ=0)
+            # 2. Xóa checkpoint .pth.tar của epoch TRƯỚC ĐÓ (tiết kiệm dung lượng)
             if meet_checkpoint_freq and self.cfg.TRAIN.CHECKPOINT_FREQ > 0:
-
-                # 2. Xóa checkpoint (.pth.tar) của epoch TRƯỚC ĐÓ
                 if epoch_to_delete > 0:
                     model_names = self.get_model_names()
                     for name in model_names:
@@ -466,15 +464,25 @@ class SimpleTrainer(TrainerBase):
                             except OSError as e:
                                 print(f"Error removing {file_to_delete}: {e}")
 
+            # ----- BẮT ĐẦU LOGIC NÉN ZIP (CHÍNH XÁC NHƯ BẠN MUỐN) -----
+            
+            # Lấy thư mục làm việc hiện tại (CWD), đây chính là thư mục .../apt/
+            cwd = os.getcwd() 
+
+            # Tên file zip (ví dụ: "apt_output_epoch_74.zip")
+            zip_file_name_prefix = "apt_output_epoch"
+
             # 3. Tạo file zip MỚI
-            # Tên file zip sẽ là: /path/to/output_dir_epoch_XX.zip
-            zip_base_name = f"{self.output_dir}_epoch_{current_epoch_num}"
+            # zip_base_name = ".../apt/apt_output_epoch_74"
+            zip_base_name = osp.join(cwd, f"{zip_file_name_prefix}_{current_epoch_num}")
+            
             try:
-                # shutil.make_archive sẽ nén toàn bộ thư mục trong 'root_dir'
+                # Nén toàn bộ thư mục 'output' (nằm bên trong 'cwd')
                 shutil.make_archive(
-                    base_name=zip_base_name,    # Tên file zip (không có .zip)
-                    format='zip',               # Định dạng
-                    root_dir=self.output_dir    # Thư mục cần nén
+                    base_name=zip_base_name,      # Tên file zip: ".../apt/apt_output_epoch_74"
+                    format='zip',                 # Định dạng
+                    root_dir=cwd,                 # Bắt đầu từ thư mục ".../apt/"
+                    base_dir="output"             # Chỉ nén thư mục con tên là "output"
                 )
                 print(f"Created new zip: {zip_base_name}.zip")
             except Exception as e:
@@ -483,13 +491,16 @@ class SimpleTrainer(TrainerBase):
             # 4. Xóa file zip CŨ (chỉ xóa nếu FREQ > 0)
             if meet_checkpoint_freq and self.cfg.TRAIN.CHECKPOINT_FREQ > 0:
                 if epoch_to_delete > 0:
-                    old_zip_file = f"{self.output_dir}_epoch_{epoch_to_delete}.zip"
+                    # old_zip_file = ".../apt/apt_output_epoch_73.zip"
+                    old_zip_file = osp.join(cwd, f"{zip_file_name_prefix}_{epoch_to_delete}.zip")
+                    
                     if osp.exists(old_zip_file):
                         try:
                             os.remove(old_zip_file)
                             print(f"Removed old zip: {old_zip_file}")
                         except OSError as e:
                             print(f"Error removing {old_zip_file}: {e}")
+                            
 
     @torch.no_grad()
     def test(self, split=None):
