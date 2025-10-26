@@ -1,4 +1,6 @@
 import time
+import os
+import shutil
 import numpy as np
 import os.path as osp
 import datetime
@@ -439,8 +441,55 @@ class SimpleTrainer(TrainerBase):
                     model_name="model-best.pth.tar"
                 )
 
+        # Logic chính để lưu, xóa, và nén
         if meet_checkpoint_freq or last_epoch:
+            # 1. Luôn lưu checkpoint của epoch hiện tại
             self.save_model(self.epoch, self.output_dir)
+
+            current_epoch_num = self.epoch + 1
+            epoch_to_delete = current_epoch_num - self.cfg.TRAIN.CHECKPOINT_FREQ
+
+            # Chỉ thực hiện xóa nếu đây là lưu định kỳ (không phải epoch cuối cùng của FREQ=0)
+            if meet_checkpoint_freq and self.cfg.TRAIN.CHECKPOINT_FREQ > 0:
+
+                # 2. Xóa checkpoint (.pth.tar) của epoch TRƯỚC ĐÓ
+                if epoch_to_delete > 0:
+                    model_names = self.get_model_names()
+                    for name in model_names:
+                        model_dir = osp.join(self.output_dir, name)
+                        file_to_delete = osp.join(model_dir, f"model.pth.tar-{epoch_to_delete}")
+                        
+                        if osp.exists(file_to_delete):
+                            try:
+                                os.remove(file_to_delete)
+                                print(f"Removed old checkpoint: {file_to_delete}")
+                            except OSError as e:
+                                print(f"Error removing {file_to_delete}: {e}")
+
+            # 3. Tạo file zip MỚI
+            # Tên file zip sẽ là: /path/to/output_dir_epoch_XX.zip
+            zip_base_name = f"{self.output_dir}_epoch_{current_epoch_num}"
+            try:
+                # shutil.make_archive sẽ nén toàn bộ thư mục trong 'root_dir'
+                shutil.make_archive(
+                    base_name=zip_base_name,    # Tên file zip (không có .zip)
+                    format='zip',               # Định dạng
+                    root_dir=self.output_dir    # Thư mục cần nén
+                )
+                print(f"Created new zip: {zip_base_name}.zip")
+            except Exception as e:
+                print(f"Error creating zip {zip_base_name}.zip: {e}")
+
+            # 4. Xóa file zip CŨ (chỉ xóa nếu FREQ > 0)
+            if meet_checkpoint_freq and self.cfg.TRAIN.CHECKPOINT_FREQ > 0:
+                if epoch_to_delete > 0:
+                    old_zip_file = f"{self.output_dir}_epoch_{epoch_to_delete}.zip"
+                    if osp.exists(old_zip_file):
+                        try:
+                            os.remove(old_zip_file)
+                            print(f"Removed old zip: {old_zip_file}")
+                        except OSError as e:
+                            print(f"Error removing {old_zip_file}: {e}")
 
     @torch.no_grad()
     def test(self, split=None):
