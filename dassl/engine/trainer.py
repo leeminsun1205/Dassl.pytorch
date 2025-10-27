@@ -152,6 +152,7 @@ class TrainerBase:
 
         for name in names:
             path = osp.join(directory, name)
+            print(path)
             if not osp.exists(path):
                 file_missing = True
                 break
