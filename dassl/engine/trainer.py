@@ -390,9 +390,9 @@ class SimpleTrainer(TrainerBase):
 
     def before_train(self):
         directory = self.cfg.OUTPUT_DIR
-        print(f'HAHHA:{directory}')
-        if self.cfg.RESUME:
-            directory = self.cfg.RESUME
+        # print(f'HAHHA:{directory}')
+        # if self.cfg.RESUME:
+        #     directory = self.cfg.RESUME
         self.start_epoch = self.resume_model_if_exist(directory)
 
         # Initialize summary writer
